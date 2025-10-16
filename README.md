@@ -334,4 +334,4 @@ python demo/image_demo.py /root/autodl-tmp/Re-Resformer/demo/2.989/2025-03-17_11
 # Contact & contribution
 - Contributions via issues and pull requests are welcome.
 
-- Author / contact: libo-yueling (add email or ORCID in the repo to assist readers).
+- Author / contact: libo-yueling (add 2023010091@ybu.edu.cn).
