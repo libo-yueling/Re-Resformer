@@ -136,7 +136,6 @@ class DataSample(BaseDataElement):
 
     def set_gt_correlation(self, value: float) -> 'DataSample':
         """Set ``gt_correlation``."""
-        # 如果需要对 contrast 值进行预处理，可以类似于 format_roughness 进行处理
         self.set_field(format_roughness(value), 'gt_correlation', dtype=torch.Tensor)
         return self
 
