@@ -7,15 +7,12 @@ from mmpretrain.structures.data_sample import DataSample
 from typing import List, Optional, Tuple, Union
 
 
-# **定义 KAN 模块**
+# KAN
 class KANLayer(nn.Module):
-    """简单的 KAN（Kolmogorov-Arnold Networks）层。"""
-
     def __init__(self, in_features, out_features, hidden_units=1):
         super(KANLayer, self).__init__()
         self.hidden_units = hidden_units
 
-        # KAN 的非线性变换部分
         self.hidden_layer = nn.Linear(in_features, hidden_units)
         self.gelu = nn.GELU()
         self.output_layer = nn.Linear(hidden_units, out_features)
@@ -27,11 +24,6 @@ class KANLayer(nn.Module):
         return x
 
 class MLPRegressor(nn.Module):
-    """
-    简单的两层 MLP，把输入特征 [B, C]（或 [B, C, 1, 1]）映射到 [B, 1]。
-    - 首先把 [B, C, 1, 1] squeeze 成 [B, C]，然后过 (C -> hidden) + ReLU -> (hidden -> 1)。
-    """
-
     def __init__(self, in_features: int, hidden_dim: int = 256, out_features: int = 1):
         super(MLPRegressor, self).__init__()
         self.fc1 = nn.Linear(in_features, hidden_dim)
@@ -45,29 +37,13 @@ class MLPRegressor(nn.Module):
         return out
 
 class LinearRegressor(nn.Module):
-    """
-    线性回归模块，把输入特征 [B, C]（或 [B, C, 1, 1]）直接映射到 [B, 1]。
-    - 如果输入是 [B, C, 1, 1]：会先 squeeze 成 [B, C]，再通过线性层得到 [B, 1]。
-    - 如果输入是 [B, C]：直接过线性层得到 [B, 1]。
-    """
-
     def __init__(self, in_features: int, out_features: int = 1):
         super(LinearRegressor, self).__init__()
-        # 一个全连接层：C -> 1
         self.fc = nn.Linear(in_features, out_features)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            x: 形状要么是 [B, C, 1, 1]，要么是 [B, C]
-        Returns:
-            torch.Tensor: [B, 1]
-        """
-        # 如果是 [B, C, 1, 1]，先 squeeze 成 [B, C]
         if x.ndim == 4 and x.shape[2:] == (1, 1):
             x = x.view(x.size(0), x.size(1))
-
-        # 此时 x 应该是 [B, C]
         out = self.fc(x)  # [B, 1]
         return out
 
@@ -97,11 +73,8 @@ class KaRHead(BaseModule):
         return feats[-1]
 
     def forward(self, feats: Tuple[torch.Tensor], data_samples: Optional[List[DataSample]] = None) -> torch.Tensor:
-    # 使用最后一个阶段的特征
-        last_feat = feats[-1]                  # Tensor 形状如 [B, C, H, W]
-        pooled = last_feat.view(last_feat.size(0), -1)  # 展平成 [B, C*H*W]
-
-        # 用 KANLayer 回归粗糙度
+        last_feat = feats[-1]                 
+        pooled = last_feat.view(last_feat.size(0), -1)  
         roughness_value = self.regressor_after_pooling(pooled)
         return roughness_value
 
@@ -135,9 +108,7 @@ class KaRHead(BaseModule):
         loss_roughness,mape = self.roughness_loss_module(roughness_value, targets_roughness, **kwargs)
         losses['loss_roughness'] = loss_roughness
         losses['mape'] = mape
-
-        # 计算总的粗糙度损失
-        losses['total_loss_roughness'] = loss_roughness  # 直接使用计算的损失
+        losses['total_loss_roughness'] = loss_roughness 
 
         return losses
     def predict(self, feats: Tuple[torch.Tensor], data_samples: Optional[List[Optional[DataSample]]] = None) -> List[
@@ -202,11 +173,8 @@ class LinearRoughnessHead(BaseModule):
         return feats[-1]
 
     def forward(self, feats: Tuple[torch.Tensor], data_samples: Optional[List[DataSample]] = None) -> torch.Tensor:
-    # 使用最后一个阶段的特征
-        last_feat = feats[-1]                  # Tensor 形状如 [B, C, H, W]
-        pooled = last_feat.view(last_feat.size(0), -1)  # 展平成 [B, C*H*W]
-
-        # 用 LinearRegressor 回归粗糙度
+        last_feat = feats[-1]                 
+        pooled = last_feat.view(last_feat.size(0), -1)  
         roughness_value = self.regressor_after_pooling(pooled)
         return roughness_value
 
@@ -240,9 +208,7 @@ class LinearRoughnessHead(BaseModule):
         loss_roughness,mape = self.roughness_loss_module(roughness_value, targets_roughness, **kwargs)
         losses['loss_roughness'] = loss_roughness
         losses['mape'] = mape
-
-        # 计算总的粗糙度损失
-        losses['total_loss_roughness'] = loss_roughness  # 直接使用计算的损失
+        losses['total_loss_roughness'] = loss_roughness
 
         return losses
     def predict(self, feats: Tuple[torch.Tensor], data_samples: Optional[List[Optional[DataSample]]] = None) -> List[
@@ -306,11 +272,8 @@ class MLPRoughnessHead(BaseModule):
         return feats[-1]
 
     def forward(self, feats: Tuple[torch.Tensor], data_samples: Optional[List[DataSample]] = None) -> torch.Tensor:
-    # 使用最后一个阶段的特征
-        last_feat = feats[-1]                  # Tensor 形状如 [B, C, H, W]
-        pooled = last_feat.view(last_feat.size(0), -1)  # 展平成 [B, C*H*W]
-
-        # 用 KANLayer 回归粗糙度
+        last_feat = feats[-1]                 
+        pooled = last_feat.view(last_feat.size(0), -1)  
         roughness_value = self.regressor_after_pooling(pooled)
         return roughness_value
 
@@ -344,9 +307,7 @@ class MLPRoughnessHead(BaseModule):
         loss_roughness,mape = self.roughness_loss_module(roughness_value, targets_roughness, **kwargs)
         losses['loss_roughness'] = loss_roughness
         losses['mape'] = mape
-
-        # 计算总的粗糙度损失
-        losses['total_loss_roughness'] = loss_roughness  # 直接使用计算的损失
+        losses['total_loss_roughness'] = loss_roughness  
 
         return losses
     def predict(self, feats: Tuple[torch.Tensor], data_samples: Optional[List[Optional[DataSample]]] = None) -> List[
