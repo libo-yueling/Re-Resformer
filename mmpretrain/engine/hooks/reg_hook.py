@@ -20,7 +20,7 @@ class ExcelLoggerHook(Hook):
 
     Args:
         out_dir (str, optional): Directory where the Excel file will be saved.
-            If None, a folder will be created under 'E:/classiyf-module/mmpretrain-main/tools'
+            If None, a folder will be created under 'E:/classiyf-module/mmpretrain-main/tools' # Modify according to the path of tools in your project
             with the current timestamp as its name.
         filename (str): Name of the Excel file. Defaults to "roughness_predictions.xlsx".
     """
@@ -32,7 +32,7 @@ class ExcelLoggerHook(Hook):
         self.filename = filename
         self.results = []
         self.log_folder = None
-        self.filepath = None  # 用于存储最终的 Excel 文件路径
+        self.filepath = None 
 
     def before_val(self, runner: Runner) -> None:
         """Called before validation starts. Create the log folder and initialize the file path."""
@@ -40,7 +40,7 @@ class ExcelLoggerHook(Hook):
             base_dir = "E:/classiyf-module/mmpretrain-main/tools"
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             self.log_folder = os.path.join(base_dir, timestamp)
-            # 用第一次生成的时间戳来命名 Excel 文件，后续都使用同一个文件
+            # Use the timestamp of the first generation to name the Excel file, and use the same file for subsequent use.
             filename_with_timestamp = f"roughness_predictions_{timestamp}.xlsx"
         else:
             self.log_folder = self.out_dir
@@ -53,7 +53,6 @@ class ExcelLoggerHook(Hook):
                        outputs: Sequence[DataSample]) -> None:
         """Collect results from each validation batch."""
         for idx, ds in enumerate(outputs):
-            # 获取真实值和预测值
             if ds.gt_roughness is not None:
                 gt_val = ds.gt_roughness.item() if isinstance(ds.gt_roughness, torch.Tensor) else ds.gt_roughness
             else:
@@ -63,14 +62,14 @@ class ExcelLoggerHook(Hook):
             else:
                 pred_val = None
 
-            # 计算 MAPE（当真实值不为0时）
+            # Compute the MAPE (when the actual value is not 0)
             if gt_val is not None and pred_val is not None and gt_val != 0:
                 mape = abs(gt_val - pred_val) / abs(gt_val) * 100
             else:
                 mape = None
 
             self.results.append({
-                "Epoch": runner.epoch,  # 使用 runner.epoch 获取当前的 epoch
+                "Epoch": runner.epoch, 
                 "Batch": batch_idx,
                 "Image Index": idx,
                 "True Roughness": gt_val,
@@ -86,7 +85,7 @@ class ExcelLoggerHook(Hook):
 
         df_new = pd.DataFrame(self.results)
 
-        # 如果 Excel 文件已存在，则加载已有数据并追加新数据，否则直接使用新数据
+        # If the Excel file already exists, load existing data and append new data, otherwise use new data directly.
         if os.path.exists(self.filepath):
             df_old = pd.read_excel(self.filepath)
             df_final = pd.concat([df_old, df_new], ignore_index=True)
@@ -96,5 +95,5 @@ class ExcelLoggerHook(Hook):
         df_final.to_excel(self.filepath, index=False)
         print(f"Excel file saved to {self.filepath}")
 
-        # 清空 results 以便下次验证重新收集数据
+        # Empty the results so that data can be collected again for the next verification
         self.results = []
