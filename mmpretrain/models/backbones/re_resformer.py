@@ -1,82 +1,74 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-'''
-用ResfoemerEncoder替代resnet的stage2/4
 
-'''
 import math
-
 import torch
 import torch.nn as nn
 import torch.utils.checkpoint as cp
 import torch.nn.functional as F
-
 from mmcv.cnn import (ConvModule, build_activation_layer, build_conv_layer,
                       build_norm_layer)
 from mmcv.cnn.bricks import DropPath
 from mmengine.model import BaseModule
 from mmengine.model.weight_init import constant_init
 from mmengine.utils.dl_utils.parrots_wrapper import _BatchNorm
-
 from mmpretrain.registry import MODELS
 from .base_backbone import BaseBackbone
 
 eps = 1.0e-5
 
 
-# 1. 定义注意力模块，threshold 和 K 均为可学习参数
+# 1. Define the attention module, where the threshold and K are both learnable parameters.
 class DADMAttention(nn.Module):
     def __init__(self, channels, reduction=16, init_threshold=1.2, init_k=10.0):
         """
-        :param channels: 输入特征通道数
-        :param reduction: 用于全连接层的降维率
-        :param init_threshold: 阈值初始值（当局部特征值超过均值的比例）
-        :param init_k: Sigmoid 中控制陡峭程度的初始值
-        threshold阈值：局部值与均值之比。init_threshold=1.2,意味着当局部特征值超过其均值 1.2 倍时，就可能认定为异常区域
+        :param channels: 
+        :param reduction: 
+        :param init_threshold: 
+        :param init_k: Sigmoid 
+        threshold: the ratio of the local value to the mean value. 
+        init_threshold=1.2, which means that when the local feature value exceeds its mean by 1.2 times, it may be identified as an abnormal area.
         """
         super(DADMAttention, self).__init__()
         self.channels = channels
         self.fc1 = nn.Linear(channels, channels // reduction)
         self.fc2 = nn.Linear(channels // reduction, channels)
-        # 将 threshold 和 K 设为可学习参数
+
         self.threshold = nn.Parameter(torch.tensor(init_threshold, dtype=torch.float))
         self.k = nn.Parameter(torch.tensor(init_k, dtype=torch.float))
 
     def forward(self, x):
         """
-        :param x: 输入特征图 [B, C, H, W]
-        :return: 加权后的特征图及注意力掩码（用于可视化）
+        :param x: input [B, C, H, W]
+        :return: The weighted feature map and attention mask
         """
         B, C, H, W = x.size()
 
-        # 全局平均池化得到全局均值向量
+        # Global average pooling to obtain the global mean vector
         global_mean = F.adaptive_avg_pool2d(x, (1, 1)).view(B, C)
         attn_global = F.relu(self.fc1(global_mean))
         attn_global = torch.sigmoid(self.fc2(attn_global)).view(B, C, 1, 1)
 
-        # 计算局部均值（这里简单使用空间平均）
+        # Compute the local mean
         eps = 1e-6
         local_mean = x.mean(dim=(2, 3), keepdim=True) + eps
-        ratio = x / local_mean  # 得到局部与均值的比值
+        ratio = x / local_mean  
 
-        # 使用软阈值：输出范围 [0, 1]，接近 1 表示正常区域，接近 0 表示缺陷区域
+        # Use soft threshold: output range [0, 1], close to 1 indicates normal area, close to 0 indicates defect area
         defect_mask = torch.sigmoid(self.k * (self.threshold - ratio))
-
-        # 融合全局信息与缺陷抑制
         attn = attn_global * defect_mask
 
-        # 返回加权后的特征图和用于可视化的掩码
         out = x * attn
         return out
 
 
-# 2. DSConv 模块（深度可分离卷积
+# 2. DSConv 
 class DSConv(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1):
         super(DSConv, self).__init__()
-        # 逐通道卷积：groups 设置为 in_channels 实现每个通道独立卷积
+        # Channel-wise Convolution: groups set to in_channels to perform independent convolution for each channel.
         self.depthwise = nn.Conv2d(in_channels, in_channels, kernel_size=kernel_size,
                                    stride=stride, padding=padding, groups=in_channels)
-        # 逐点卷积：1x1 卷积，用于通道整合和调整输出通道数
+        # Pointwise Convolution: 1x1 convolution, used for channel integration and adjusting the number of output channels.
         self.pointwise = nn.Conv2d(in_channels, out_channels, kernel_size=1)
         self.gelu = nn.GELU()
 
@@ -87,11 +79,10 @@ class DSConv(nn.Module):
         return x
 
 
-# 3. KAN 模块（包含一个卷积层和 sin 激活）
+# 3. KAN module (consisting of a convolutional layer and sin activation)
 class KAN(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, padding=1):
         super(KAN, self).__init__()
-        # KAN 的非线性变换部分
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=padding)
         self.gelu = nn.GELU()
 
@@ -102,47 +93,37 @@ class KAN(nn.Module):
         return x
 
 
-# 4. Resfoemer Encoder 的定义
-# 五个部分：DSConv1 -> LN1 -> DSConv2 -> LN2 -> KAN
+# 4. Resfoemer Encoder 
+# Five parts：DSConv1 -> LN1 -> DSConv2 -> LN2 -> KAN
 class ResformerEncoder(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
         super(ResformerEncoder, self).__init__()
-        # 第一部分
         self.dsconv1 = DSConv(in_channels, hidden_channels)
         self.gn = nn.GroupNorm(num_groups=16, num_channels=hidden_channels)
         self.ln = nn.LayerNorm(hidden_channels)
         self.attten1 = DADMAttention(hidden_channels)
-        # 如果 in_channels 与 hidden_channels 不同，可以添加投影
         if in_channels != hidden_channels:
             self.proj1 = nn.Conv2d(in_channels, hidden_channels, kernel_size=1, stride=1)
         else:
             self.proj1 = nn.Identity()
 
         self.dsconv2 = DSConv(hidden_channels, hidden_channels)
-
-        # 第一残差分支投影（如果需要的话，这里通常是相同通道数就可以直接加）
-        # 第二部分
-        # 为了匹配从 hidden_channels 到 out_channels 的转换
         self.proj2 = nn.Conv2d(hidden_channels, out_channels, kernel_size=1, stride=1)
         self.kan = KAN(hidden_channels, out_channels)
-        # 此 conv2 可以用作另一条路径（根据需要）
         self.conv2 = nn.Conv2d(hidden_channels, out_channels, kernel_size=3, padding=1, stride=1)
 
     def forward(self, x):
-        # 如果需要先对输入进行投影
         x = self.proj1(x)
         x = self.attten1(x)
         x = self.dsconv1(x)
-        residual = x.clone()  # 残差分支1
+        residual = x.clone()  
         x = self.gn(x)
         x = self.dsconv2(x)
-        # 第一残差连接
         x += residual
 
-        residual = x.clone()  # 残差分支2
+        residual = x.clone()  
         x = self.gn(x)
         x = self.kan(x)
-        # 对第二个残差分支进行通道投影，使其与 x 匹配
         x += self.proj2(residual)
         return x
 
@@ -784,7 +765,6 @@ class ReResformer(BaseBackbone):
                     constant_init(m.norm2, 0)
                     
     def forward(self, x, cond=None):
-        """修改 forward 接口，增加 cond 参数用于传递 RSN 条件信息"""
         layer_features = []
 
         if self.deep_stem:
