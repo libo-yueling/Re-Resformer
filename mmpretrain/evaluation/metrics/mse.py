@@ -69,7 +69,6 @@ class MSE(BaseMetric):
         """
         for data_sample in data_samples:
             result = dict()
-            # 收集预测值和真实值
             result['pred_roughness'] = data_sample['pred_roughness'].cpu()
             result['gt_roughness'] = data_sample['gt_roughness'].cpu()
             self.results.append(result)
@@ -83,15 +82,12 @@ class MSE(BaseMetric):
         Returns:
             dict: The computed metrics with keys like 'mse'.
         """
-        # 将预测值和真实值拼接为张量
         pred = torch.cat([res['pred_roughness'] for res in results])
         target = torch.cat([res['gt_roughness'] for res in results])
 
-        # 验证维度一致性
         assert pred.shape == target.shape, \
             f"Prediction shape {pred.shape} doesn't match target {target.shape}"
 
-        # 计算MSE
         mse = self.calculate(pred, target)
         return {'mse': mse.item()}
 
@@ -107,13 +103,10 @@ class MSE(BaseMetric):
         Returns:
             torch.Tensor: The computed MSE value.
         """
-        # 转换为张量
         pred = to_tensor(pred).float()
         target = to_tensor(target).float()
 
-        # 验证维度一致性
         assert pred.shape == target.shape, \
             f"Prediction shape {pred.shape} doesn't match target {target.shape}"
 
-        # 计算均方误差
         return torch.mean((pred - target) ** 2)
