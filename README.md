@@ -79,6 +79,13 @@ Re-Resformer/dataset/
 │   └── test.txt
 ```
 ---
+# Dataset label
+We have a python file (label_make.py) for label generation in the dataset folder, and after the dataset is set up according to the data structure you can directly run label_make.py to get the text file of the data label:
+```bash
+cd path to /Re-Resformer/dataset
+python label_make.py
+```
+you will get three txt (train.txt,val.txt,test.txt)
 
 # Quick start (reproducible setup)
 
