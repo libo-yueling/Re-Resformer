@@ -41,7 +41,7 @@ class MAPE(BaseMetric):
         >>> y_pred = torch.tensor([1.2, 2.3, 3.4, 4.5])
         >>> y_true = torch.tensor([1.0, 2.0, 3.0, 4.0])
         >>> MAPE.calculate(y_pred, y_true)
-        tensor(12.5)  # 示例输出
+        tensor(12.5)  # example
         >>>
         >>> # ------------------- Use with Evaluator -------------------
         >>> from mmpretrain.structures import DataSample
@@ -73,7 +73,6 @@ class MAPE(BaseMetric):
         """
         for data_sample in data_samples:
             result = dict()
-            # 收集预测值和真实值
             result['pred_roughness'] = data_sample['pred_roughness'].cpu()
             result['gt_roughness'] = data_sample['gt_roughness'].cpu()
             self.results.append(result)
@@ -119,13 +118,10 @@ class MAPE(BaseMetric):
         Returns:
             torch.Tensor: The computed MAPE value.
         """
-        # 转换为张量
         pred = to_tensor(pred).float()
         target = to_tensor(target).float()
 
-        # 验证维度一致性
         assert pred.shape == target.shape, \
             f"Prediction shape {pred.shape} doesn't match target {target.shape}"
 
-        # 计算平均绝对百分比误差
         return torch.mean(torch.abs((target - pred) / target)) * 100
