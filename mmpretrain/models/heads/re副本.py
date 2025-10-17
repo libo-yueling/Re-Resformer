@@ -7,15 +7,12 @@ from mmpretrain.structures.data_sample import DataSample
 from typing import List, Optional, Tuple, Union
 
 
-# **定义 KAN 模块**
+# KAN
 class KANLayer(nn.Module):
-    """简单的 KAN（Kolmogorov-Arnold Networks）层。"""
-
     def __init__(self, in_features, out_features, hidden_units=1):
         super(KANLayer, self).__init__()
         self.hidden_units = hidden_units
 
-        # KAN 的非线性变换部分
         self.hidden_layer = nn.Linear(in_features, hidden_units)
         self.gelu = nn.GELU()
         self.output_layer = nn.Linear(hidden_units, out_features)
@@ -49,13 +46,11 @@ class KaRHead(BaseModule):
         return feats[-1]
 
     def forward(self, feats: Tuple[torch.Tensor], data_samples: Optional[List[DataSample]] = None) -> torch.Tensor:
-        # 将所有层的特征进行拼接
+        # Concatenate the features of all layers
         # for i in range(len(feats)):
         #     print(feats[i])
         #     print(feats[i].size())
         pooled_features_for_regression = torch.cat([feat.view(feat.size(0), -1) for feat in feats], dim=1)
-
-        # 回归粗糙度
         roughness_value = self.regressor_after_pooling(pooled_features_for_regression)
 
         return roughness_value
@@ -90,8 +85,7 @@ class KaRHead(BaseModule):
         losses['loss_roughness'] = loss_roughness
         losses['mape'] = mape
 
-        # 计算总的粗糙度损失
-        losses['total_loss_roughness'] = loss_roughness  # 直接使用计算的损失
+        losses['total_loss_roughness'] = loss_roughness 
 
         return losses
 
