@@ -40,6 +40,10 @@ Re-Resformer/
 ├── README.md
 └── CITATION.cff, LICENSE, .gitignore
 ```
+# Dataset description
+The test set data is confidential, so this project only uploads the training set and validation set, 
+and the data in the test set file in the project is data of the validation set.
+
 # Dataset structure
 ```bash
 Re-Resformer/dataset/
