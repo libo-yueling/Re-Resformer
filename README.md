@@ -202,7 +202,7 @@ export PYTHONPATH=$(pwd):$PYTHONPATH
 ```
 Run:
 ```bash
-python train.py
+python train.py  configs/re-resformer/Re-Resformer.py
 ```
 # Evaluation / test
 
