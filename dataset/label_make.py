@@ -1,6 +1,6 @@
 import os
 import glob
-import re 
+import re
 
 data_root = '/root/autodl-tmp/mmcls/dataset/niejihejing/pingxi'
 train_dir = os.path.join(data_root, 'train')
@@ -20,13 +20,12 @@ def process_dataset(directory, data_list):
         class_path = os.path.join(directory, class_name)
         if os.path.isdir(class_path):
             image_files = glob.glob(os.path.join(class_path, '*.*'))
-            match = re.search(r'(\d+\.\d+)', class_name) 
+            match = re.search(r'(\d+\.\d+)', class_name)
             if match:
-                roughness_value = float(match.group(1)) 
+                roughness_value = float(match.group(1))
             else:
                 continue
 
-            # 只保存粗糙度值
             for image_file in image_files:
                 rel_path = image_file.replace('\\', '/')
                 data_list.append(f"{rel_path} {roughness_value}\n")
